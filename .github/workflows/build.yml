@@ -1,10 +1,8 @@
-name: Build
-run-name: build ${{ inputs.job }}
+name: Build APK
 on:
+  push:
+    paths: ['**.zip']
   workflow_dispatch:
-    inputs:
-      job:
-        required: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,48 +10,25 @@ jobs:
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
     steps:
-      # Тянем только нужный ZIP, а не весь репозиторий
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: jobs/${{ inputs.job }}.zip
-          sparse-checkout-cone-mode: false
-          fetch-depth: 1
-      # JDK 17 уже установлен на раннере — экономим время на setup-java
-      - name: Use preinstalled JDK 17
-        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-      # Кэш зависимостей Gradle между сборками
+        with: { fetch-depth: 0 }
+      - run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
       - uses: gradle/actions/setup-gradle@v3
         with: { gradle-version: "8.7" }
-      - name: Tune Gradle
-        run: |
-          mkdir -p ~/.gradle
-          cat >> ~/.gradle/gradle.properties <<'PROPS'
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.workers.max=4
-          org.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC -XX:MaxMetaspaceSize=1g
-          kotlin.compiler.execution.strategy=in-process
-          kotlin.incremental=false
-          android.enableR8.fullMode=false
-          PROPS
-      - name: Stable signing key
-        run: |
-          mkdir -p ~/.android
-          echo "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" | base64 -d > ~/.android/debug.keystore
       - name: Unzip and build
         run: |
+          Z=$(git log -1 --diff-filter=AM --name-only --pretty=format: -- '*.zip' | head -n1)
+          [ -n "$Z" ] || { echo "ZIP не найден в последнем коммите"; exit 1; }
           mkdir work
-          unzip -q -o jobs/${{ inputs.job }}.zip -d work -x '__MACOSX/*'
+          unzip -q -o "$Z" -d work -x '__MACOSX/*'
           S=$(find work -maxdepth 3 \( -name settings.gradle -o -name settings.gradle.kts \) | head -n1)
           [ -n "$S" ] || { echo "В ZIP нет settings.gradle(.kts)"; exit 1; }
           cd "$(dirname "$S")"
-          # arm64-v8a — архитектура Nothing Phone (1): без лишних ABI сборка и APK меньше
           ARGS="assembleDebug --parallel --build-cache --console=plain -Pandroid.injected.build.abi=arm64-v8a"
           if [ -f gradlew ]; then chmod +x gradlew; ./gradlew $ARGS; else gradle $ARGS; fi
       - uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ inputs.job }}
+          name: apk
           path: work/**/build/outputs/apk/debug/*.apk
           compression-level: 0
-          retention-days: 1
           if-no-files-found: error
